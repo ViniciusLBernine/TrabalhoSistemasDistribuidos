@@ -1,6 +1,7 @@
 package br.edu.utfpr.td.tsi.gerenciador.config;
 
 import br.edu.utfpr.td.tsi.gerenciador.model.PedidoRequest;
+import br.edu.utfpr.td.tsi.gerenciador.model.PagamentoRequest;
 import com.mongodb.client.model.changestream.ChangeStreamDocument;
 import org.bson.Document;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
@@ -14,6 +15,8 @@ import org.springframework.data.mongodb.core.messaging.MessageListener;
 import org.springframework.data.mongodb.core.messaging.MessageListenerContainer;
 import org.springframework.data.mongodb.core.query.Criteria;
 
+import java.math.BigDecimal;
+
 @Configuration
 public class MongoEventoConfig {
 
@@ -21,14 +24,34 @@ public class MongoEventoConfig {
 	public MessageListenerContainer messageListenerContainer(MongoTemplate mongoTemplate,
 			RabbitTemplate rabbitTemplate) {
 		MessageListenerContainer container = new DefaultMessageListenerContainer(mongoTemplate);
-		container.start();
 
-		MessageListener<ChangeStreamDocument<Document>, PedidoRequest> listener = event -> {
-			PedidoRequest novoPedido = event.getBody();
+		System.out.println("--- INICIANDO CONFIGURAÇÃO DO CHANGE STREAM (MODO RAW DOCUMENT) ---");
 
-			if (novoPedido != null) {
-				System.out.println("GERENCIADOR DE EVENTOS: Novo pedido detectado no banco de dados para "
-						+ novoPedido.getEmailUsuario());
+		MessageListener<ChangeStreamDocument<Document>, Document> listener = event -> {
+			Document doc = event.getBody();
+
+			if (doc != null) {
+				System.out.println("GERENCIADOR DE EVENTOS: Novo pedido detectado no banco para: "
+						+ doc.getString("emailUsuario"));
+
+				PedidoRequest novoPedido = new PedidoRequest();
+				if (doc.get("_id") != null)
+					novoPedido.setId(doc.get("_id").toString());
+				novoPedido.setEmailUsuario(doc.getString("emailUsuario"));
+				novoPedido.setCep(doc.getString("cep"));
+
+				if (doc.get("valorBase") != null) {
+					novoPedido.setValorBase(new BigDecimal(doc.get("valorBase").toString()));
+				}
+
+				Document pagDoc = (Document) doc.get("pagamento");
+				if (pagDoc != null) {
+					PagamentoRequest pag = new PagamentoRequest();
+					if (pagDoc.get("valorTotal") != null) {
+						pag.setValorTotal(new BigDecimal(pagDoc.get("valorTotal").toString()));
+					}
+					novoPedido.setPagamento(pag);
+				}
 
 				rabbitTemplate.convertAndSend("fila.email",
 						"Confirmação de pedido recebida para: " + novoPedido.getEmailUsuario());
@@ -36,11 +59,12 @@ public class MongoEventoConfig {
 			}
 		};
 
-		ChangeStreamRequest<PedidoRequest> request = ChangeStreamRequest.builder(listener).collection("pedidos")
+		ChangeStreamRequest<Document> request = ChangeStreamRequest.builder(listener).collection("pedidos")
 				.filter(Aggregation.newAggregation(Aggregation.match(Criteria.where("operationType").is("insert"))))
 				.build();
 
-		container.register(request, PedidoRequest.class);
+		container.register(request, Document.class);
+		container.start();
 
 		return container;
 	}
