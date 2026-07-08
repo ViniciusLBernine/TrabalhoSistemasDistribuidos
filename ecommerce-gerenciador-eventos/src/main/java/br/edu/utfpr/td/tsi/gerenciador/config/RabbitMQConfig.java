@@ -16,6 +16,17 @@ public class RabbitMQConfig {
 	}
 
 	@Bean
+	public Queue pagamentoQueue() {
+		return QueueBuilder.durable("fila.pagamento").withArgument("x-dead-letter-exchange", "")
+				.withArgument("x-dead-letter-routing-key", "fila.pagamento.dlq").build();
+	}
+
+	@Bean
+	public Queue emailQueue() {
+		return QueueBuilder.durable("fila.email").build();
+	}
+
+	@Bean
 	public Queue compraConcluidaQueue() {
 		return QueueBuilder.durable("fila.compra.concluida").build();
 	}

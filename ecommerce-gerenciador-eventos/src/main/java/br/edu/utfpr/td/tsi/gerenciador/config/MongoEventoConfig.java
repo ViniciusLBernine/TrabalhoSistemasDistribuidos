@@ -17,29 +17,31 @@ import org.springframework.data.mongodb.core.query.Criteria;
 @Configuration
 public class MongoEventoConfig {
 
-    @Bean
-    public MessageListenerContainer messageListenerContainer(MongoTemplate mongoTemplate, RabbitTemplate rabbitTemplate) {
-        MessageListenerContainer container = new DefaultMessageListenerContainer(mongoTemplate);
-        container.start();
+	@Bean
+	public MessageListenerContainer messageListenerContainer(MongoTemplate mongoTemplate,
+			RabbitTemplate rabbitTemplate) {
+		MessageListenerContainer container = new DefaultMessageListenerContainer(mongoTemplate);
+		container.start();
 
-        MessageListener<ChangeStreamDocument<Document>, PedidoRequest> listener = event -> {
-            PedidoRequest novoPedido = event.getBody();
-            
-            if (novoPedido != null) {
-                System.out.println("GERENCIADOR DE EVENTOS: Novo pedido detectado no banco de dados para " + novoPedido.getEmailUsuario());
-                
-                rabbitTemplate.convertAndSend("fila.email", "Confirmação de pedido recebida para: " + novoPedido.getEmailUsuario());
-                rabbitTemplate.convertAndSend("fila.pagamento", novoPedido);
-            }
-        };
+		MessageListener<ChangeStreamDocument<Document>, PedidoRequest> listener = event -> {
+			PedidoRequest novoPedido = event.getBody();
 
-        ChangeStreamRequest<PedidoRequest> request = ChangeStreamRequest.builder(listener)
-                .collection("pedidos")
-                .filter(Aggregation.newAggregation(Aggregation.match(Criteria.where("operationType").is("insert"))))
-                .build();
+			if (novoPedido != null) {
+				System.out.println("GERENCIADOR DE EVENTOS: Novo pedido detectado no banco de dados para "
+						+ novoPedido.getEmailUsuario());
 
-        container.register(request, PedidoRequest.class);
+				rabbitTemplate.convertAndSend("fila.email",
+						"Confirmação de pedido recebida para: " + novoPedido.getEmailUsuario());
+				rabbitTemplate.convertAndSend("fila.pagamento", novoPedido);
+			}
+		};
 
-        return container;
-    }
+		ChangeStreamRequest<PedidoRequest> request = ChangeStreamRequest.builder(listener).collection("pedidos")
+				.filter(Aggregation.newAggregation(Aggregation.match(Criteria.where("operationType").is("insert"))))
+				.build();
+
+		container.register(request, PedidoRequest.class);
+
+		return container;
+	}
 }
