@@ -16,22 +16,23 @@ import org.springframework.data.mongodb.core.messaging.MessageListenerContainer;
 import org.springframework.data.mongodb.core.query.Criteria;
 
 import java.math.BigDecimal;
+import java.util.logging.Logger;
 
 @Configuration
 public class MongoEventoConfig {
+
+	private static final Logger logger = Logger.getLogger(MongoEventoConfig.class.getSimpleName());
 
 	@Bean
 	public MessageListenerContainer messageListenerContainer(MongoTemplate mongoTemplate,
 			RabbitTemplate rabbitTemplate) {
 		MessageListenerContainer container = new DefaultMessageListenerContainer(mongoTemplate);
 
-		System.out.println("--- INICIANDO CONFIGURAÇÃO DO CHANGE STREAM (MODO RAW DOCUMENT) ---");
-
 		MessageListener<ChangeStreamDocument<Document>, Document> listener = event -> {
 			Document doc = event.getBody();
 
 			if (doc != null) {
-				System.out.println("GERENCIADOR DE EVENTOS: Novo pedido detectado no banco para: "
+				logger.info("GERENCIADOR DE EVENTOS: Novo pedido detectado no banco para: "
 						+ doc.getString("emailUsuario"));
 
 				PedidoRequest novoPedido = new PedidoRequest();
