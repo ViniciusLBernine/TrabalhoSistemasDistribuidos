@@ -16,6 +16,7 @@ import org.springframework.data.mongodb.core.messaging.MessageListenerContainer;
 import org.springframework.data.mongodb.core.query.Criteria;
 
 import java.math.BigDecimal;
+import java.util.List;
 import java.util.logging.Logger;
 
 @Configuration
@@ -40,6 +41,10 @@ public class MongoEventoConfig {
 					novoPedido.setId(doc.get("_id").toString());
 				novoPedido.setEmailUsuario(doc.getString("emailUsuario"));
 				novoPedido.setCep(doc.getString("cep"));
+				List<String> produtos = doc.getList("produtosIds", String.class);
+				if (produtos != null) {
+				    novoPedido.setProdutosIds(produtos);
+				}
 
 				if (doc.get("valorBase") != null) {
 					novoPedido.setValorBase(new BigDecimal(doc.get("valorBase").toString()));
